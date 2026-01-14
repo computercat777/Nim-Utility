@@ -1,0 +1,193 @@
+## This module provides functions to align texts.
+## The procedures consider multibyte strings (ex: あいうえお, 漢字).
+##
+## Basic usage
+## ===========
+##
+## Show example that aligns text that has half width string and full width
+## string.
+
+runnableExamples:
+  import alignment
+
+  let s = @["abcde", "あいうえお", "ABC", "あ", "123456789"]
+  let aligned = s.alignCenter
+  doAssert aligned[0] == "  abcde   "
+  doAssert aligned[1] == "あいうえお"
+  doAssert aligned[2] == "   ABC    "
+  doAssert aligned[3] == "    あ    "
+  doAssert aligned[4] == "123456789 "
+
+  for line in aligned:
+    echo "| ", line, " |"
+
+  ## Output:
+  ## |   abcde    |
+  ## | あいうえお |
+  ## |    ABC     |
+  ## |     あ     |
+  ## | 123456789  |
+
+import eastasianwidth
+import strutils
+from sequtils import mapIt
+
+template linesMaxWidth(lines: openArray[string], width: int): int =
+  let m = lines.mapIt(it.stringWidth).max
+  if width < 0: m
+  elif width < m: m
+  else: width
+
+proc alignLeft*(lines: openArray[string], pad = " ", halfPad = " ",
+    width = -1, additionalPadWidth = 0): seq[string] =
+  ## Aligns strings with padding, so that it is of max look length of strings.
+  ## Padding string are added before resulting in left alignment.
+  runnableExamples:
+    let aligned = @["abcde", "あいうえお"].alignLeft
+    doAssert aligned[0] == "abcde     "
+    doAssert aligned[1] == "あいうえお"
+
+    let aligned2 = @["abcde", "あいうえお"].alignLeft(pad = "ん", halfPad = "X")
+    doAssert aligned2[0] == "abcdeXんん"
+    doAssert aligned2[1] == "あいうえお"
+
+    let aligned3 = @["abcde", "あいうえお"].alignLeft(width = 14)
+    doAssert aligned3[0] == "abcde         "
+    doAssert aligned3[1] == "あいうえお    "
+
+    let aligned4 = @["abcde", "あいうえお"].alignLeft(
+        additionalPadWidth = 10)
+    doAssert aligned4[0] == "abcde               "
+    doAssert aligned4[1] == "あいうえお          "
+
+  if lines.len < 1: return
+  if pad == "":
+    result.add lines
+    return
+  let lineMaxWidth = linesMaxWidth(lines, width) + additionalPadWidth
+  for line in lines:
+    let diff = lineMaxWidth - line.stringWidth
+    let repeatCount = int(diff / pad.stringWidth)
+    var s = line
+    if 0 < repeatCount:
+      let pads = pad.repeat(repeatCount).join
+      s.add halfPad.repeat(lineMaxWidth - line.stringWidth -
+          pads.stringWidth).join
+      s.add pads
+    elif 0 < diff:
+      s.add halfPad.repeat(diff)
+    result.add s
+
+proc alignCenter*(lines: openArray[string], pad = " ", halfPad = " ",
+    width = -1, additionalPadWidth = 0): seq[string] =
+  ## Aligns strings with padding, so that it is of max look length of strings.
+  ## Padding string are added before and after resulting in center alignment.
+  runnableExamples:
+    let aligned = @["abcde", "あいうえお"].alignCenter
+    doAssert aligned[0] == "  abcde   "
+    doAssert aligned[1] == "あいうえお"
+
+    let aligned2 = @["abcde", "あいうえお"].alignCenter(pad = "ん", halfPad = "X")
+    doAssert aligned2[0] == "んabcdeXん"
+    doAssert aligned2[1] == "あいうえお"
+
+    let aligned3 = @["abcde", "あいうえお"].alignCenter(width = 14)
+    doAssert aligned3[0] == "    abcde     "
+    doAssert aligned3[1] == "  あいうえお  "
+
+    let aligned4 = @["abcde", "あいうえお"].alignCenter(
+        additionalPadWidth = 10)
+    doAssert aligned4[0] == "       abcde        "
+    doAssert aligned4[1] == "     あいうえお     "
+
+  if lines.len < 1: return
+  if pad == "":
+    result.add lines
+    return
+  let lineMaxWidth = linesMaxWidth(lines, width) + additionalPadWidth
+  for line in lines:
+    let diff = lineMaxWidth - line.stringWidth
+    var s: string
+    if 0 < diff:
+      let repeatCount = int(diff / pad.stringWidth / 2)
+      let p = pad.repeat(repeatCount).join
+      s.add p
+
+      let lc2 = int((lineMaxWidth - line.stringWidth - int(p.stringWidth * 2)) / 2)
+      let p2 = halfPad.repeat(lc2).join
+      s.add p2
+      s.add line
+      s.add halfPad.repeat(lineMaxWidth - line.stringWidth - p.stringWidth * 2 -
+          p2.stringWidth * 2).join
+      s.add p2
+
+      s.add p
+    else:
+      s.add line
+    result.add s
+
+proc alignRight*(lines: openArray[string], pad = " ", halfPad = " ",
+    width = -1, additionalPadWidth = 0): seq[string] =
+  ## Aligns strings with padding, so that it is of max look length of strings.
+  ## Padding string are added after resulting in right alignment.
+  runnableExamples:
+    let aligned = @["abcde", "あいうえお"].alignRight
+    doAssert aligned[0] == "     abcde"
+    doAssert aligned[1] == "あいうえお"
+
+    let aligned2 = @["abcde", "あいうえお"].alignRight(pad = "ん", halfPad = "X")
+    doAssert aligned2[0] == "んんXabcde"
+    doAssert aligned2[1] == "あいうえお"
+
+    let aligned3 = @["abcde", "あいうえお"].alignRight(width = 14)
+    doAssert aligned3[0] == "         abcde"
+    doAssert aligned3[1] == "    あいうえお"
+
+    let aligned4 = @["abcde", "あいうえお"].alignRight(
+        additionalPadWidth = 10)
+    doAssert aligned4[0] == "               abcde"
+    doAssert aligned4[1] == "          あいうえお"
+
+  if lines.len < 1: return
+  if pad == "":
+    result.add lines
+    return
+  let lineMaxWidth = linesMaxWidth(lines, width) + additionalPadWidth
+  for line in lines:
+    let diff = lineMaxWidth - line.stringWidth
+    let repeatCount = int(diff / pad.stringWidth)
+    var s: string
+    if 0 < repeatCount:
+      let pads = pad.repeat(repeatCount).join
+      s.add pads
+      s.add halfPad.repeat(lineMaxWidth - line.stringWidth -
+          pads.stringWidth).join
+    elif 0 < diff:
+      s.add halfPad.repeat(diff)
+    s.add line
+    result.add s
+
+#[
+MIT License
+
+Copyright (c) 2019 jiro4989
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+]#
